@@ -35,14 +35,14 @@ test_endpoint() {
     
     response=$(curl -s -w "\n%{http_code}" "$url")
     status_code=$(echo "$response" | tail -n 1)
-    body=$(echo "$response" | head -n -1)
+    body=$(echo "$response" | sed '$d')
     
     if [ "$status_code" == "$expected_status" ]; then
         echo -e "${GREEN}✓ PASS${NC} (Status: $status_code)"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         echo -e "${RED}✗ FAIL${NC} (Expected: $expected_status, Got: $status_code)"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -70,10 +70,10 @@ elapsed=$((end_time - start_time))
 
 if [ $elapsed -ge 2 ] && [ $elapsed -le 3 ]; then
     echo -e "${GREEN}✓ PASS${NC} (Took ${elapsed}s)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAIL${NC} (Expected ~2s, Got ${elapsed}s)"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 # Test 7: Large payload
@@ -83,10 +83,10 @@ size=${#response}
 
 if [ $size -gt 90000 ]; then
     echo -e "${GREEN}✓ PASS${NC} (Size: $size bytes)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAIL${NC} (Expected >90KB, Got $size bytes)"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 # Test 8: Check response headers
@@ -95,10 +95,10 @@ headers=$(curl -s -I "$SITE_URL/api/test")
 
 if echo "$headers" | grep -q "application/json" && echo "$headers" | grep -q "no-store"; then
     echo -e "${GREEN}✓ PASS${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAIL${NC} (Missing required headers)"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 # Test 9: Homepage loads
@@ -106,10 +106,10 @@ echo -n "Testing: Homepage (/) ... "
 status=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/")
 if [ "$status" == "200" ]; then
     echo -e "${GREEN}✓ PASS${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAIL${NC} (Status: $status)"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 # Test 10: Large page loads
@@ -117,10 +117,10 @@ echo -n "Testing: Large page (/large.html) ... "
 status=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/large.html")
 if [ "$status" == "200" ]; then
     echo -e "${GREEN}✓ PASS${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗ FAIL${NC} (Status: $status)"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 # Summary
