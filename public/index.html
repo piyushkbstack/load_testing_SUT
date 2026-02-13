@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RCA Mock Site</title>
+</head>
+<body>
+  <h1>RCA Mock Site</h1>
+  <img src="/assets/large-image.jpg" width="1200" />
+  <button onclick="callApi()">Call API</button>
+
+  <script>
+    function callApi() {
+      fetch('/api/test?delay=1000')
+        .then(res => res.json())
+        .then(data => console.log(data));
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Large Page - RCA Mock Site</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .image-container {
+      margin: 20px 0;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Large Page for LCP Testing</h1>
+  <p>This page contains multiple large images to test Largest Contentful Paint (LCP) metrics.</p>
+  
+  <div class="image-container">
+    <img src="/assets/large-image.jpg" width="1200" alt="Large Image 1" />
+  </div>
+  
+  <div class="image-container">
+    <img src="/assets/large-image.jpg" width="1200" alt="Large Image 2" />
+  </div>
+  
+  <div class="image-container">
+    <img src="/assets/large-image.jpg" width="1200" alt="Large Image 3" />
+  </div>
+  
+  <div class="image-container">
+    <img src="/assets/large-image.jpg" width="1200" alt="Large Image 4" />
+  </div>
+  
+  <button onclick="callSlowApi()">Call Slow API</button>
+  <button onclick="callFastApi()">Call Fast API</button>
+  
+  <div id="result"></div>
+
+  <script>
+    function callSlowApi() {
+      const start = Date.now();
+      fetch('/api/test?delay=3000&size=100')
+        .then(res => res.json())
+        .then(data => {
+          const duration = Date.now() - start;
+          document.getElementById('result').innerHTML = `<p>Slow API completed in ${duration}ms</p>`;
+        });
+    }
+
+    function callFastApi() {
+      const start = Date.now();
+      fetch('/api/test?delay=100')
+        .then(res => res.json())
+        .then(data => {
+          const duration = Date.now() - start;
+          document.getElementById('result').innerHTML = `<p>Fast API completed in ${duration}ms</p>`;
+        });
+    }
+  </script>
+</body>
+</html>
