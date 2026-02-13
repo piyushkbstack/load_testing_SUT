@@ -1,5 +1,10 @@
 {
   "name": "rca-mock-site",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "description": "RCA Mock Site for Load Testing - Cloudflare Pages",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "validate": "./validate.sh http://localhost:8788"
+  }
 }

@@ -1,3 +1,6 @@
+# This project uses Cloudflare Pages (not Workers)
+# Deploy via GitHub integration or: wrangler pages deploy public
+
 name = "rca-mock-site"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "public"

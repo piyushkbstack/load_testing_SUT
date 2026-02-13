@@ -1,0 +1,17 @@
+# Build Configuration for Cloudflare Pages
+
+# This file is for Cloudflare Pages build configuration
+# See: https://developers.cloudflare.com/pages/
+
+[build]
+  # No build command needed - static files are ready
+  command = ""
+  
+  # Output directory containing static files
+  publish = "public"
+
+[build.environment]
+  # No environment variables needed
+
+# Note: This project uses Pages Functions 
+# Functions are automatically detected from /functions directory
