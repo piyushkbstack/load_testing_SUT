@@ -14,6 +14,12 @@ NC='\033[0m' # No Color
 # Get site URL from argument or use default
 SITE_URL="${1:-http://localhost:8788}"
 
+# Auto-convert http to https for .pages.dev domains
+if [[ "$SITE_URL" =~ ^http://.*\.pages\.dev ]]; then
+    SITE_URL="${SITE_URL/http:/https:}"
+    echo "ℹ️  Auto-converted to HTTPS for Cloudflare Pages"
+fi
+
 echo "================================================"
 echo "  RCA Mock Site - Validation Tests"
 echo "================================================"
@@ -103,7 +109,7 @@ fi
 
 # Test 9: Homepage loads
 echo -n "Testing: Homepage (/) ... "
-status=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/")
+status=$(curl -L -s -o /dev/null -w "%{http_code}" "$SITE_URL/")
 if [ "$status" == "200" ]; then
     echo -e "${GREEN}✓ PASS${NC}"
     PASSED=$((PASSED + 1))
@@ -114,7 +120,7 @@ fi
 
 # Test 10: Large page loads
 echo -n "Testing: Large page (/large.html) ... "
-status=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/large.html")
+status=$(curl -L -s -o /dev/null -w "%{http_code}" "$SITE_URL/large.html")
 if [ "$status" == "200" ]; then
     echo -e "${GREEN}✓ PASS${NC}"
     PASSED=$((PASSED + 1))
