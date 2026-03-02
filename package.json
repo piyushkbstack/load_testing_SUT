@@ -1,5 +1,5 @@
 {
-  "name": "rca-mock-site",
+  "name": "load-testing-sut",
   "version": "1.0.0",
   "private": true,
   "description": "RCA Mock Site for Load Testing - Cloudflare Pages",

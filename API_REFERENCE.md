@@ -6,7 +6,7 @@
 
 ## 🌐 Base URL
 
-**Production:** `https://rca-mock-site.pages.dev`  
+**Production:** `https://load-testing-sut.pages.dev`  
 **Local Dev:** `http://localhost:8788`
 
 ---
@@ -48,7 +48,7 @@ GET /api/test?delay=3000
 
 **Example:**
 ```bash
-curl "https://rca-mock-site.pages.dev/api/test?delay=3000"
+curl "https://load-testing-sut.pages.dev/api/test?delay=3000"
 # Returns after 3 seconds
 ```
 
@@ -304,7 +304,7 @@ export let options = {
 };
 
 export default function () {
-  const baseUrl = 'https://rca-mock-site.pages.dev';
+  const baseUrl = 'https://load-testing-sut.pages.dev';
   
   // 70% success
   if (Math.random() < 0.7) {
@@ -339,7 +339,7 @@ Run the automated validation suite:
 ./validate.sh http://localhost:8788
 
 # Production
-./validate.sh https://rca-mock-site.pages.dev
+./validate.sh https://load-testing-sut.pages.dev
 ```
 
 **Expected Output:**

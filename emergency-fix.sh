@@ -14,4 +14,4 @@ git push
 
 echo ""
 echo "✅ Done! Wait 1-2 minutes for Cloudflare to redeploy"
-echo "Then test with: ./validate.sh https://rca-mock-site.pages.dev"
+echo "Then test with: ./validate.sh https://load-testing-sut.pages.dev"

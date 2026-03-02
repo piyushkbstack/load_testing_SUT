@@ -49,7 +49,7 @@ git push -u origin main
 
 4. **Configure Build Settings**
    ```
-   Project name: rca-mock-site (or your choice)
+   Project name: load-testing-sut (or your choice)
    Production branch: main
    Framework preset: None
    Build command: (leave empty)
@@ -64,7 +64,7 @@ git push -u origin main
    - Wait 1-2 minutes for deployment
 
 7. **Get Your URL**
-   - You'll receive: `https://rca-mock-site.pages.dev`
+   - You'll receive: `https://load-testing-sut.pages.dev`
    - Or custom: `https://your-project-name.pages.dev`
 
 ---
@@ -75,7 +75,7 @@ git push -u origin main
 
 ```bash
 # Replace with your actual URL
-export SITE_URL="https://rca-mock-site.pages.dev"
+export SITE_URL="https://load-testing-sut.pages.dev"
 
 # Test 1: Basic success
 curl $SITE_URL/api/test
@@ -152,14 +152,14 @@ wrangler login
 
 ```bash
 cd /Users/piyushkumar/Work_Repo/load_sut_project
-wrangler pages deploy public --project-name=rca-mock-site
+wrangler pages deploy public --project-name=load-testing-sut
 ```
 
 ### Output
 
 ```
 ✨ Successfully deployed!
-🌍 https://rca-mock-site.pages.dev
+🌍 https://load-testing-sut.pages.dev
 ```
 
 ---
@@ -233,7 +233,7 @@ If domain is not on Cloudflare:
 ```
 Type: CNAME
 Name: mock
-Value: rca-mock-site.pages.dev
+Value: load-testing-sut.pages.dev
 ```
 
 ---
@@ -288,7 +288,7 @@ The site can handle:
 
 1. **Save your deployment URL**
    ```bash
-   echo "https://rca-mock-site.pages.dev" > DEPLOYMENT_URL.txt
+   echo "https://load-testing-sut.pages.dev" > DEPLOYMENT_URL.txt
    ```
 
 2. **Configure load testing tool**

@@ -70,7 +70,7 @@ Cloudflare automatically redeploys on push.
 npm install -g wrangler
 
 # Deploy
-wrangler pages deploy public --project-name=rca-mock-site
+wrangler pages deploy public --project-name=load-testing-sut
 ```
 
 ### Option 3: Dashboard Manual Upload

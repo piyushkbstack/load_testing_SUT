@@ -84,7 +84,7 @@ Create this exact file:
 
 ```json
 {
-  "name": "rca-mock-site",
+  "name": "load-testing-sut",
   "version": "1.0.0",
   "private": true
 }
@@ -99,7 +99,7 @@ No dependencies required.
 Create this file at root:
 
 ```toml
-name = "rca-mock-site"
+name = "load-testing-sut"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "public"
 ```

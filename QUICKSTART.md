@@ -75,7 +75,7 @@ git push -u origin main
 3. Click **Connect to Git**
 4. Select your repository: `load_testing_SUT`
 5. Configure:
-   - **Project name**: `rca-mock-site` (or your choice)
+   - **Project name**: `load-testing-sut` (or your choice)
    - **Production branch**: `main`
    - **Framework preset**: None
    - **Build command**: (leave empty)
@@ -83,13 +83,13 @@ git push -u origin main
 6. Click **Save and Deploy**
 7. Wait ~1 minute for deployment
 
-You'll get: `https://rca-mock-site.pages.dev` (or your-chosen-name)
+You'll get: `https://load-testing-sut.pages.dev` (or your-chosen-name)
 
 ### 5️⃣ Validate Deployment
 
 ```bash
 # Replace with your actual URL
-export SITE_URL="https://rca-mock-site.pages.dev"
+export SITE_URL="https://load-testing-sut.pages.dev"
 
 # Run validation
 ./validate.sh $SITE_URL
@@ -101,7 +101,7 @@ Expected output:
   RCA Mock Site - Validation Tests
 ================================================
 
-Testing site: https://rca-mock-site.pages.dev
+Testing site: https://load-testing-sut.pages.dev
 
 Testing: Basic API call ... ✓ PASS (Status: 200)
 Testing: 500 Error simulation ... ✓ PASS (Status: 500)
@@ -159,19 +159,19 @@ export let options = {
 };
 
 export default function () {
-  http.get('https://rca-mock-site.pages.dev/api/test');
+  http.get('https://load-testing-sut.pages.dev/api/test');
 }
 ```
 
 **Example for JMeter**:
-- Server: `rca-mock-site.pages.dev`
+- Server: `load-testing-sut.pages.dev`
 - Protocol: `https`
 - Path: `/api/test`
 
 **Example for Artillery**:
 ```yaml
 config:
-  target: "https://rca-mock-site.pages.dev"
+  target: "https://load-testing-sut.pages.dev"
 ```
 
 ### Review Test Scenarios
