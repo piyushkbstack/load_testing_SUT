@@ -54,32 +54,32 @@ The API supports query parameters for deterministic testing:
 
 ### Success Response
 ```bash
-curl https://your-site.pages.dev/api/test
+curl https://load-testing-sut.pages.dev/api/test
 ```
 
 ### Simulating Latency
 ```bash
-curl https://your-site.pages.dev/api/test?delay=3000
+curl https://load-testing-sut.pages.dev/api/test?delay=3000
 ```
 
 ### Simulating 500 Error
 ```bash
-curl https://your-site.pages.dev/api/test?status=500
+curl https://load-testing-sut.pages.dev/api/test?status=500
 ```
 
 ### Simulating Database Error
 ```bash
-curl https://your-site.pages.dev/api/test?status=500&errorType=db
+curl https://load-testing-sut.pages.dev/api/test?status=500&errorType=db
 ```
 
 ### Large Payload
 ```bash
-curl https://your-site.pages.dev/api/test?size=500
+curl https://load-testing-sut.pages.dev/api/test?size=500
 ```
 
 ### Combined Scenario
 ```bash
-curl https://your-site.pages.dev/api/test?delay=2000&status=503&errorType=db&size=100
+curl https://load-testing-sut.pages.dev/api/test?delay=2000&status=503&errorType=db&size=100
 ```
 
 ## 🧪 Test Scenarios

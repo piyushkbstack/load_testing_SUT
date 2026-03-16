@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lazy Loading Test Page - RCA Mock Site</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+    }
+    .controls {
+      margin: 20px 0;
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #c82333;
+    }
+    #status {
+      margin-top: 10px;
+      padding: 10px;
+      background: #e7f3ff;
+      border-radius: 4px;
+      color: #004085;
+    }
+    .scroll-container {
+      max-height: 600px;
+      overflow-y: scroll;
+      border: 1px solid #ddd;
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+      margin-top: 20px;
+    }
+    .lazy-item {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-left: 4px solid #007bff;
+      border-radius: 4px;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+    }
+    .lazy-item img {
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+      border-radius: 4px;
+    }
+    .lazy-item.loaded {
+      border-left-color: #28a745;
+      background: #f0f8f0;
+    }
+    .item-info {
+      font-size: 12px;
+      color: #999;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Lazy Loading Test Page</h1>
+    <p>Scroll down to trigger lazy-loaded images and content. Uses Intersection Observer API.</p>
+    
+    <div class="controls">
+      <button onclick="initializeLazyLoading()">Initialize Lazy Loading</button>
+      <button onclick="scrollToBottom()">Scroll to Bottom</button>
+      <button onclick="resetLazyLoading()">Reset</button>
+      <div id="status"></div>
+    </div>
+
+    <div class="scroll-container" id="scrollContainer">
+      <div id="lazyContent"></div>
+    </div>
+  </div>
+
+  <script>
+    const lazyItems = [];
+    let lazyObserver;
+
+    function updateStatus(message) {
+      document.getElementById('status').textContent = message;
+    }
+
+    function createLazyItem(index, delay = null) {
+      const item = document.createElement('div');
+      item.className = 'lazy-item';
+      item.id = `lazy-item-${index}`;
+      
+      const delayText = delay ? `${delay}ms APIDelay` : '0ms';
+      item.innerHTML = `
+        <div>
+          <div>Loading image ${index} (${delayText})...</div>
+          <div class="item-info">Item #${index} - Waiting to be visible</div>
+        </div>
+      `;
+      
+      item.dataset.imageIndex = index;
+      item.dataset.delay = delay || 0;
+      item.dataset.loaded = 'false';
+      
+      return item;
+    }
+
+    function loadLazyImage(item) {
+      if (item.dataset.loaded === 'true') return;
+      
+      const index = item.dataset.imageIndex;
+      const delay = item.dataset.delay;
+      
+      // Create image that loads from API with delay
+      const timestamp = Date.now();
+      const src = `/api/test?delay=${delay}&size=${50 + index * 10}`;
+      
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = `Lazy loaded image ${index}`;
+      img.loading = 'lazy';
+      
+      img.onload = () => {
+        item.classList.add('loaded');
+        item.innerHTML = `
+          <div>
+            <img src="${src}" alt="Lazy loaded image ${index}" />
+            <div class="item-info">Image ${index} loaded in ${Date.now() - timestamp}ms</div>
+          </div>
+        `;
+        item.dataset.loaded = 'true';
+      };
+      
+      img.onerror = () => {
+        item.innerHTML = `
+          <div style="color: red;">
+            <div>Failed to load image ${index}</div>
+            <div class="item-info">Error after ${Date.now() - timestamp}ms</div>
+          </div>
+        `;
+        item.data.loaded = 'error';
+      };
+      
+      // Start loading
+      item.innerHTML = '';
+      item.appendChild(img);
+    }
+
+    function initializeLazyLoading() {
+      const container = document.getElementById('lazyContent');
+      container.innerHTML = '';
+      lazyItems.length = 0;
+      
+      // Create 50 lazy items with random delays
+      for (let i = 1; i <= 50; i++) {
+        const delay = Math.random() > 0.5 ? Math.floor(Math.random() * 3000) + 500 : 0;
+        const item = createLazyItem(i, delay);
+        container.appendChild(item);
+        lazyItems.push(item);
+      }
+      
+      // Setup Intersection Observer
+      if (lazyObserver) lazyObserver.disconnect();
+      
+      lazyObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            loadLazyImage(entry.target);
+            lazyObserver.unobserve(entry.target);
+          }
+        });
+      }, {
+        root: document.getElementById('scrollContainer'),
+        rootMargin: '100px',
+        threshold: 0.1
+      });
+      
+      lazyItems.forEach(item => lazyObserver.observe(item));
+      
+      updateStatus(`Initialized ${lazyItems.length} lazy-loadable items`);
+    }
+
+    function scrollToBottom() {
+      const container = document.getElementById('scrollContainer');
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+        updateStatus('Scrolled to bottom');
+      }, 100);
+    }
+
+    function resetLazyLoading() {
+      if (lazyObserver) lazyObserver.disconnect();
+      document.getElementById('lazyContent').innerHTML = '';
+      lazyItems.length = 0;
+      updateStatus('Lazy loading reset');
+    }
+
+    // Initialize on page load
+    window.addEventListener('load', () => {
+      initializeLazyLoading();
+    });
+  </script>
+</body>
+</html>

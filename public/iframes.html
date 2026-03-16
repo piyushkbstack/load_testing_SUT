@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Iframes Test Page - RCA Mock Site</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+    }
+    .iframe-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .iframe-item {
+      background: white;
+      border-radius: 4px;
+      padding: 15px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .iframe-item h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    iframe {
+      width: 100%;
+      height: 300px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .controls {
+      margin: 20px 0;
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      background: #ffc107;
+      color: #333;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #ffb800;
+    }
+    #status {
+      margin-top: 10px;
+      padding: 10px;
+      background: #e7f3ff;
+      border-radius: 4px;
+      color: #004085;
+    }
+    .iframe-stat {
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Iframes & Nested Content Test Page</h1>
+    <p>This page tests iframe loading, nested content, and cross-origin interactions.</p>
+    
+    <div class="controls">
+      <button onclick="loadAllIframes()">Load All Iframes</button>
+      <button onclick="loadSlowIframes()">Load Slow Iframes (5s)</button>
+      <button onclick="reloadIframes()">Reload Iframes</button>
+      <button onclick="clearIframes()">Clear</button>
+      <div id="status"></div>
+    </div>
+
+    <div id="iframeGrid" class="iframe-grid"></div>
+  </div>
+
+  <script>
+    function updateStatus(message) {
+      document.getElementById('status').textContent = message;
+    }
+
+    function clearIframes() {
+      document.getElementById('iframeGrid').innerHTML = '';
+      updateStatus('Iframes cleared');
+    }
+
+    function createIframeItem(title, src, delay = null) {
+      const item = document.createElement('div');
+      item.className = 'iframe-item';
+      const delayText = delay ? ` (${delay}ms delay)` : '';
+      item.innerHTML = `
+        <h3>${title}${delayText}</h3>
+        <iframe src="${src}" title="${title}" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+        <div class="iframe-stat">Created at ${new Date().toLocaleTimeString()}</div>
+      `;
+      return item;
+    }
+
+    function loadAllIframes() {
+      clearIframes();
+      const grid = document.getElementById('iframeGrid');
+      updateStatus('Loading iframes...');
+      
+      // SUT internal iframe
+      grid.appendChild(createIframeItem('SUT API Response (0ms)', '/api/test?size=10'));
+      
+      // Slow SUT iframe
+      grid.appendChild(createIframeItem('SUT API Response (2s)', '/api/test?delay=2000&size=50', 2000));
+      
+      // External site iframes (real-world)
+      grid.appendChild(createIframeItem('External: JSON Server', 'https://jsonplaceholder.typicode.com/users'));
+      grid.appendChild(createIframeItem('External: HTTPBin Status', 'https://httpbin.org/status/200'));
+      
+      // More SUT iframes with variations
+      grid.appendChild(createIframeItem('SUT Large Payload', '/api/test?size=500', 1000));
+      grid.appendChild(createIframeItem('SUT Custom Path', '/api/custom-endpoint', 500));
+      
+      updateStatus(`Loaded ${grid.children.length} iframes`);
+    }
+
+    function loadSlowIframes() {
+      clearIframes();
+      const grid = document.getElementById('iframeGrid');
+      updateStatus('Loading slow iframes (5s each)...');
+      
+      for (let i = 1; i <= 4; i++) {
+        const delay = 5000;
+        grid.appendChild(createIframeItem(`Slow Frame ${i}`, `/api/test?delay=${delay}&size=${100 * i}`, delay));
+      }
+      
+      updateStatus(`Loaded ${grid.children.length} slow iframes`);
+    }
+
+    function reloadIframes() {
+      const iframes = document.querySelectorAll('iframe');
+      updateStatus(`Reloading ${iframes.length} iframes...`);
+      
+      iframes.forEach((iframe, index) => {
+        setTimeout(() => {
+          iframe.src = iframe.src;
+        }, index * 500);
+      });
+      
+      updateStatus(`Reload initiated for ${iframes.length} iframes`);
+    }
+  </script>
+</body>
+</html>

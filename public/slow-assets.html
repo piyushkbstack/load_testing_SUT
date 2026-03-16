@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Slow Assets Test Page - RCA Mock Site</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+    }
+    .controls {
+      margin: 20px 0;
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      background: #6f42c1;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #5a32a3;
+    }
+    #status {
+      margin-top: 10px;
+      padding: 10px;
+      background: #e7f3ff;
+      border-radius: 4px;
+      color: #004085;
+    }
+    .loading-indicator {
+      margin: 20px 0;
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #007bff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .asset-info {
+      margin: 15px 0;
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+      border-left: 4px solid #6f42c1;
+    }
+    .asset-info h3 {
+      margin-top: 0;
+    }
+    .timer {
+      font-size: 24px;
+      font-weight: bold;
+      color: #6f42c1;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Slow Assets Test Page</h1>
+    <p>This page tests slow-loading assets, render-blocking resources, and timeout scenarios.</p>
+    
+    <div class="controls">
+      <button onclick="testSlowLoad()">Test Slow Load (5s)</button>
+      <button onclick="testVerySlowLoad()">Test Very Slow Load (10s)</button>
+      <button onclick="testMultipleAssets()">Test Multiple Slow Assets</button>
+      <button onclick="testProgressiveLoad()">Test Progressive Load</button>
+      <div id="status"></div>
+    </div>
+
+    <div id="contentArea"></div>
+  </div>
+
+  <script>
+    function updateStatus(message) {
+      document.getElementById('status').textContent = message;
+    }
+
+    function createLoadingElement(title, duration) {
+      const div = document.createElement('div');
+      div.className = 'asset-info';
+      div.innerHTML = `
+        <h3>${title}</h3>
+        <div class="spinner"></div>
+        <div id="timer-${Date.now()}" class="timer">0s</div>
+        <div id="message-${Date.now()}"></div>
+      `;
+      return div;
+    }
+
+    function startTimer(elementId, duration) {
+      let elapsed = 0;
+      const timerEl = document.getElementById(`timer-${elementId}`);
+      const msgEl = document.getElementById(`message-${elementId}`);
+      
+      const interval = setInterval(() => {
+        elapsed++;
+        timerEl.textContent = elapsed + 's / ' + duration + 's';
+        
+        if (elapsed >= duration) {
+          clearInterval(interval);
+          timerEl.style.color = '#28a745';
+          msgEl.textContent = '✓ Loaded successfully';
+          msgEl.style.color = '#28a745';
+        }
+      }, 1000);
+    }
+
+    function testSlowLoad() {
+      const area = document.getElementById('contentArea');
+      area.innerHTML = '';
+      updateStatus('Starting 5-second load test...');
+      
+      const timestamp = Date.now();
+      const element = createLoadingElement('Slow Asset (5s Delay)', 5);
+      area.appendChild(element);
+      
+      startTimer(timestamp, 5);
+      
+      // Simulate loading
+      fetch(`/api/test?delay=5000&size=100`)
+        .then(res => res.json())
+        .then(data => {
+          updateStatus(`5s load completed | Response: ${data.message}`);
+        })
+        .catch(err => {
+          updateStatus(`Error: ${err.message}`);
+        });
+    }
+
+    function testVerySlowLoad() {
+      const area = document.getElementById('contentArea');
+      area.innerHTML = '';
+      updateStatus('Starting 10-second load test...');
+      
+      const timestamp = Date.now();
+      const element = createLoadingElement('Very Slow Asset (10s Delay)', 10);
+      area.appendChild(element);
+      
+      startTimer(timestamp, 10);
+      
+      // Simulate loading with potential timeout
+      fetch(`/api/test?delay=10000&size=500&errorType=db`)
+        .then(res => res.json())
+        .then(data => {
+          updateStatus(`10s load completed | Full response time: ${Date.now() - Date.now()}ms`);
+        })
+        .catch(err => {
+          updateStatus(`Error after 10s: ${err.message}`);
+        });
+    }
+
+    function testMultipleAssets() {
+      const area = document.getElementById('contentArea');
+      area.innerHTML = '';
+      updateStatus('Loading 5 slow assets in parallel...');
+      
+      const promises = [];
+      
+      for (let i = 1; i <= 5; i++) {
+        const delay = (i * 2000);
+        const timestamp = Date.now() + i;
+        const element = createLoadingElement(`Asset ${i} (${delay}ms)`, delay / 1000);
+        area.appendChild(element);
+        
+        startTimer(timestamp, delay / 1000);
+        
+        promises.push(
+          fetch(`/api/test?delay=${delay}&size=${100 * i}`)
+            .then(res => res.json())
+        );
+      }
+      
+      Promise.all(promises)
+        .then(results => {
+          updateStatus(`All 5 assets loaded! Total requests completed.`);
+        })
+        .catch(err => {
+          updateStatus(`Some assets failed: ${err.message}`);
+        });
+    }
+
+    function testProgressiveLoad() {
+      const area = document.getElementById('contentArea');
+      area.innerHTML = '';
+      updateStatus('Starting progressive load test...');
+      
+      const baseDelay = 1000;
+      
+      for (let i = 1; i <= 5; i++) {
+        setTimeout(() => {
+          const delay = (i * baseDelay);
+          const timestamp = Date.now() + i;
+          const element = createLoadingElement(`Progressive Asset ${i} (Delay: ${delay}ms)`, 3);
+          area.appendChild(element);
+          
+          startTimer(timestamp, 3);
+          
+          fetch(`/api/test?delay=${delay}&size=${50 * i}`)
+            .then(res => res.json())
+            .then(data => {
+              updateStatus(`Asset ${i} loaded after ${delay}ms delay`);
+            });
+        }, i * 1500);
+      }
+      
+      updateStatus('Progressive load test initiated');
+    }
+  </script>
+</body>
+</html>
