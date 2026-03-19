@@ -4,6 +4,7 @@ name: "Test Scenario Generator"
 tools: [read, edit, search]
 argument-hint: "Describe the incident scenario you want to simulate (e.g., 'database overload with auth cascading failures', 'gradual memory leak leading to OOM')"
 user-invocable: true
+model: Claude Sonnet 4.6 (copilot)
 ---
 
 You are a **Load Test Scenario Architect** specializing in creating realistic production incident simulations for Root Cause Analysis (RCA) agent validation.
@@ -354,43 +355,72 @@ export default function () {
 ### Step 4: Create Expected RCA Report JSON
 File naming: `/test_data/expected_rca_report_<number>.json`
 
-Structure (match the format in `expected_rca_report_12.json`):
+**IMPORTANT**: The RCA agent receives test results in this data format:
+
+**Data Sources Available to RCA Agent:**
+1. **summary.json** - Overall metrics:
+   - `PluSummaryWidget.summaryData.{totalRequests, errorCount, apiErrorPercentage, avgResponseTime, p90ResponseTime, p95ResponseTime, maxVus}`
+   - `PluApiPerformance.networkPerformanceSummaryGraphData.responseTimeMetrics.{t_avg, t_p90, t_p95}.data[]` - Time-series arrays with `{x: timestamp, y: value}`
+
+2. **api_metrics.json** - Performance by endpoint:
+   - `PluSlowResponse.responseMetrics.{label, threadGroup}` with time-series data
+
+3. **api_errors.json** - Error breakdown:
+   - `PluErrorBreakdownWidget.errorBreakdown.{byResponseCode[], byLabel[], byThreadgroup[]}`
+   - `PluErrorDistributionTableWidget.errorDistributionTableData[]`
+   - `hasNoErrors: true/false`
+
+4. **api_performance_metrics.json** - Per-endpoint table:
+   - `tableData[]` with `{label, requestRate, avg, max, min, p90, p95, p99, requestCount, errorPercentage}`
+
+5. **execution_logs.json** - Test execution metadata:
+   - `{totalSessions, failedSessions, passedSessions, logs[]}`
+
+6. **metadata.json** - Test configuration:
+   - `testRunDetails.metadata.{testType, vusCount, duration, loadZones, startTime, endTime}`
+
+**CRITICAL - SIMPLIFIED FORMAT**: The actual RCA agent output uses a simplified format. Match this structure exactly:
+
 ```json
 {
-  "test_scenario": "XX-scenario-name.js",
-  "description": "Brief description of the simulated incident",
   "top_findings": [
-    "🔴 Critical finding with latency/error numbers",
-    "🟡 Medium/warning finding",
-    "🟢 Positive finding (recovery, stability)"
+    "🔴 Severe backend latency degradation detected: P95 response time increased from <100ms (baseline) to 15,000ms (peak), with 25% total error rate indicating critical database performance issues.",
+    "🔴 Multiple cascading service failures observed: 15% auth failures (401), 10% database connection errors (503), and 8% server errors (500) during peak incident window.",
+    "🟡 Progressive degradation pattern: Gradual latency increase over 3.5 minutes (100ms→15s) suggests resource exhaustion rather than sudden infrastructure failure."
   ],
   "cross_tab_findings": [
     {
-      "origin": "Product|Environment|Test Configuration",
-      "severity": "Critical|High|Medium|Low|Info",
-      "issue_detected": "Specific observable issue with metrics",
-      "possible_cause": "Root cause explanation with technical reasoning",
-      "suggestions": "Actionable recommendations with immediate/short-term/long-term actions",
-      "suggestion_heading": "Brief action summary",
-      "tab": "summary|requests|execution_logs",
-      "time_window": "When this issue occurred",
-      "affected_endpoints": ["Specific API endpoints"],
-      "evidence": "Supporting data points"
+      "origin": "Product",
+      "severity": "Critical",
+      "issue_detected": "Severe database latency degradation: Response times increased progressively from <100ms to 15,000ms peak (180s-240s window), affecting all database-backed endpoints.",
+      "possible_cause": "Database connection pool exhaustion or query performance degradation under load. Gradual increase pattern suggests resource contention from slow queries accumulating in the connection pool, increased table lock contention, or insufficient database scaling capacity.",
+      "suggestions": "Immediate actions: (1) Review database connection pool settings and increase max connections, (2) Analyze slow query logs for queries during incident window, (3) Check database CPU/memory/IO utilization metrics, (4) Implement query timeout limits. Long-term: Add read replicas, implement query caching, optimize heavy analytics queries.",
+      "suggestion_heading": "Critical: Database performance bottleneck requires immediate action",
+      "tab": "summary"
+    },
+    {
+      "origin": "Product",
+      "severity": "Critical",
+      "issue_detected": "Authentication service failures: ~15% of requests returned 401 errors at peak, starting at 60s mark and progressively increasing to 25% before declining.",
+      "possible_cause": "Auth service cache invalidation or session store failure correlated with database overload. Progressive increase suggests cascading failure as database latency impacted session validation queries.",
+      "suggestions": "Immediate actions: (1) Review auth service dependency on main database - consider dedicated auth DB or in-memory cache, (2) Check session store health during incident window, (3) Implement circuit breaker for auth validation to prevent cascading failures.",
+      "suggestion_heading": "Critical: Auth service cascading failure - decouple from database",
+      "tab": "requests"
     }
-  ],
-  "root_cause_analysis": {
-    "primary_root_cause": "The underlying root cause",
-    "confidence": "High|Medium|Low",
-    "evidence": ["Supporting evidence points"],
-    "cascading_effects": ["Issue A → Issue B chains"]
-  },
-  "recommended_actions": {
-    "immediate": ["Action items"],
-    "short_term": ["Action items"],
-    "long_term": ["Action items"]
-  }
+  ]
 }
 ```
+
+**REQUIRED FORMAT RULES:**
+- ✅ **ONLY** `top_findings` (array of 3 strings) and `cross_tab_findings` (array of objects)
+- ✅ Each finding in `cross_tab_findings` MUST have: `origin`, `severity`, `issue_detected`, `possible_cause`, `suggestions`, `suggestion_heading`, `tab`
+- ❌ **DO NOT include**: `data_sources`, `expected_metrics_from_test`, `data_evidence`, `root_cause_analysis`, `recommended_actions`, `rca_agent_validation_notes`
+- ❌ **DO NOT include**: `test_scenario`, `description` at root level
+
+**Origin Values:**
+- `Product` - Application/service issues
+- `Environment` - Infrastructure/configuration issues
+- `Test Configuration` - Test metadata/validation notes
 
 **Severity Guidelines:**
 - **Critical**: System-breaking, >50% error rate, >10s latency
@@ -406,6 +436,11 @@ Structure (match the format in `expected_rca_report_12.json`):
 - Recovery characteristics
 - Service-specific impacts
 - Configuration/environment issues
+
+**Tab Values:**
+- `summary` - Overall metrics and trends
+- `requests` - Per-endpoint performance and errors
+- `execution_logs` - Test execution metadata
 
 ### Step 5: Validate Alignment
 Ensure:

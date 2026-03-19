@@ -78,11 +78,37 @@ The agent will create two files:
 - Location: `test_data/<number>-<descriptive-name>.js`
 - Contains: Realistic load test with time-based issue progression
 - Features: Proper endpoint groups, metrics, traffic patterns, checks
+- Real-world behaviors: Retry logic, variable think time, user abandonment, session correlation
 
 ### 2. Expected RCA Report JSON
 - Location: `test_data/expected_rca_report_<number>.json`
 - Contains: Detailed findings an RCA agent should detect
 - Includes: Severity, issues, causes, suggestions, timeline, root cause analysis
+- **NEW**: Data evidence references showing exact JSON paths where RCA agent finds supporting data
+
+### Data Structure RCA Agent Receives
+
+The RCA agent analyzes test results in these JSON files:
+
+1. **summary.json** - High-level metrics
+   - Overall: `PluSummaryWidget.summaryData.{totalRequests, errorCount, apiErrorPercentage, avgResponseTime, p90/p95}`
+   - Time-series: `PluApiPerformance.networkPerformanceSummaryGraphData.responseTimeMetrics.{t_avg, t_p90, t_p95}.data[]`
+
+2. **api_errors.json** - Error breakdown
+   - By code: `PluErrorBreakdownWidget.errorBreakdown.byResponseCode[]` (e.g., 401, 503, 500)
+   - By endpoint: `errorBreakdown.byLabel[]`
+   - Distribution: `PluErrorDistributionTableWidget.errorDistributionTableData[]`
+
+3. **api_performance_metrics.json** - Per-endpoint metrics
+   - Table: `tableData[]` with `{label, avg, p90, p95, errorPercentage, requestCount}`
+
+4. **api_metrics.json** - Detailed performance by endpoint/threadgroup
+
+5. **execution_logs.json** - Test metadata (sessions, VUs, logs)
+
+6. **metadata.json** - Test configuration (duration, VUs, load zones)
+
+**Expected JSON now includes `data_evidence` fields** pointing to exact paths in these files.
 
 ## Agent Capabilities
 
