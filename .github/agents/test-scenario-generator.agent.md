@@ -355,6 +355,12 @@ export default function () {
 ### Step 4: Create Expected RCA Report JSON
 File naming: `/test_data/expected_rca_report_<number>.json`
 
+**Purpose**: This JSON serves as the ground truth for RCA agent validation. It is used to:
+1. Compare against RCA agent-generated output
+2. Calculate confidence scores for RCA agent accuracy
+3. Validate that the agent correctly identifies root causes, cascading effects, and severity levels
+4. Benchmark RCA agent performance across different incident types
+
 **IMPORTANT**: The RCA agent receives test results in this data format:
 
 **Data Sources Available to RCA Agent:**
@@ -384,15 +390,15 @@ File naming: `/test_data/expected_rca_report_<number>.json`
 ```json
 {
   "top_findings": [
-    "🔴 Severe backend latency degradation detected: P95 response time increased from <100ms (baseline) to 15,000ms (peak), with 25% total error rate indicating critical database performance issues.",
-    "🔴 Multiple cascading service failures observed: 15% auth failures (401), 10% database connection errors (503), and 8% server errors (500) during peak incident window.",
+    "🔴 Severe backend latency degradation detected: P95 response time 15,000ms (High severity: P90=14000ms > avg × 3), with 25% total error rate (High severity: >5%) indicating critical database performance issues.",
+    "🔴 Multiple cascading service failures observed: 15% auth failures (High: error rate >5%), 10% database connection errors (High: >5%), and 8% server errors (High: >5%) during peak incident window.",
     "🟡 Progressive degradation pattern: Gradual latency increase over 3.5 minutes (100ms→15s) suggests resource exhaustion rather than sudden infrastructure failure."
   ],
   "cross_tab_findings": [
     {
       "origin": "Product",
       "severity": "Critical",
-      "issue_detected": "Severe database latency degradation: Response times increased progressively from <100ms to 15,000ms peak (180s-240s window), affecting all database-backed endpoints.",
+      "issue_detected": "Severe database latency degradation: Response times increased progressively from <100ms to 15,000ms peak (180s-240s window), affecting all database-backed endpoints. Severity: High based on P90 (14000ms) > avg (5000ms) × 3.",
       "possible_cause": "Database connection pool exhaustion or query performance degradation under load. Gradual increase pattern suggests resource contention from slow queries accumulating in the connection pool, increased table lock contention, or insufficient database scaling capacity.",
       "suggestions": "Immediate actions: (1) Review database connection pool settings and increase max connections, (2) Analyze slow query logs for queries during incident window, (3) Check database CPU/memory/IO utilization metrics, (4) Implement query timeout limits. Long-term: Add read replicas, implement query caching, optimize heavy analytics queries.",
       "suggestion_heading": "Critical: Database performance bottleneck requires immediate action",
@@ -400,11 +406,11 @@ File naming: `/test_data/expected_rca_report_<number>.json`
     },
     {
       "origin": "Product",
-      "severity": "Critical",
-      "issue_detected": "Authentication service failures: ~15% of requests returned 401 errors at peak, starting at 60s mark and progressively increasing to 25% before declining.",
+      "severity": "High",
+      "issue_detected": "Authentication service failures: ~15% of requests returned 401 errors at peak (High severity: error rate >5%), starting at 60s mark and progressively increasing to 25% before declining.",
       "possible_cause": "Auth service cache invalidation or session store failure correlated with database overload. Progressive increase suggests cascading failure as database latency impacted session validation queries.",
       "suggestions": "Immediate actions: (1) Review auth service dependency on main database - consider dedicated auth DB or in-memory cache, (2) Check session store health during incident window, (3) Implement circuit breaker for auth validation to prevent cascading failures.",
-      "suggestion_heading": "Critical: Auth service cascading failure - decouple from database",
+      "suggestion_heading": "High: Auth service cascading failure - decouple from database",
       "tab": "requests"
     }
   ]
@@ -423,11 +429,61 @@ File naming: `/test_data/expected_rca_report_<number>.json`
 - `Test Configuration` - Test metadata/validation notes
 
 **Severity Guidelines:**
-- **Critical**: System-breaking, >50% error rate, >10s latency
-- **High**: Major degradation, 20-50% errors, 3-10s latency
-- **Medium**: Noticeable impact, 5-20% errors, 1-3s latency
-- **Low**: Minor issues, <5% errors, <1s latency
-- **Info**: Observations, no action needed
+
+Use these precise thresholds to classify findings:
+
+**Application Error Rates:**
+- **High**: Overall API error rate > 5%
+- **Medium**: Overall API error rate 1% – 5%
+- **Low**: Overall API error rate < 1%
+
+**API Response Time Analysis:**
+- **High**: avg_response_time > P90 (significant tail latency)
+- **Medium**: P90 > avg × 3 (moderate tail latency)
+- **Low**: P90 > avg × 2 (minor tail latency)
+
+**Threshold Breaches (SLA violations):**
+- **High**: breach_ratio >= 1.2X (20%+ over threshold)
+- **Medium**: breach_ratio between 1.0X and 1.2X (0-20% over threshold)
+
+**Core Web Vitals (Frontend Performance):**
+- **LCP (Largest Contentful Paint)**:
+  - High: > 4000ms
+  - Medium: 2500-4000ms
+  - Low: < 2500ms
+- **CLS (Cumulative Layout Shift)**:
+  - High: > 0.25
+  - Medium: 0.10-0.25
+  - Low: < 0.10
+- **INP (Interaction to Next Paint)**:
+  - High: > 500ms
+  - Medium: 200-500ms
+  - Low: < 200ms
+- **FCP (First Contentful Paint)**:
+  - High: > 3000ms
+  - Medium: 1800-3000ms
+  - Low: < 1800ms
+- **TTFB (Time to First Byte)**:
+  - High: > 1500ms
+  - Medium: 600-1500ms
+  - Low: < 600ms
+
+**Test Case Success Rate:**
+- **High**: Test success rate < 70% (critical test failures)
+- **Medium**: Test success rate < 90% (moderate failures)
+- **Low**: Test success rate >= 90% (minor failures)
+
+**Critical Severity (reserved for system-breaking issues):**
+- Complete service outage
+- Data loss or corruption
+- Security breach
+- Multiple High severity issues occurring simultaneously
+- Cascading failures affecting core business functions
+
+**Info Severity:**
+- Observations without impact
+- Successful test validation
+- Normal behavior documentation
 
 **Finding Categories:**
 - Primary root cause (the original trigger)
@@ -442,6 +498,18 @@ File naming: `/test_data/expected_rca_report_<number>.json`
 - `requests` - Per-endpoint performance and errors
 - `execution_logs` - Test execution metadata
 
+**Applying Severity Thresholds:**
+When creating findings, ALWAYS include the severity justification based on the thresholds above. Format:
+- In `issue_detected`: Include the metric calculation (e.g., "error rate 15% >5% = High")
+- In `top_findings`: Reference the severity and threshold (e.g., "High severity: error rate >5%")
+- Examples:
+  - "15% error rate (High: >5%)"
+  - "P90=14000ms > avg=5000ms × 3 (High)"
+  - "LCP 4500ms (High: >4000ms)"
+  - "Test success rate 85% (Medium: <90%)"
+
+This allows the RCA agent validator to verify severity classifications are correct based on defined thresholds.
+
 ### Step 5: Validate Alignment
 Ensure:
 - ✅ Script timeline matches JSON time_windows
@@ -450,6 +518,7 @@ Ensure:
 - ✅ Script endpoint groups match JSON affected_endpoints
 - ✅ JSON identifies cascading effects in correct order
 - ✅ JSON root cause matches script's primary issue trigger
+- ✅ Severity levels use correct thresholds with justifications
 
 ## Output Format
 
