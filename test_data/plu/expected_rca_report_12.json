@@ -1,0 +1,108 @@
+{
+  "top_findings": [
+    "🔴 Severe backend latency degradation detected: P95 response time 15,000ms with P90=14000ms > avg=5000ms × 2 (Low tail ratio, but absolute latency extreme) and 25% total error rate (High: >5%) — multiple simultaneous High issues = Critical.",
+    "🔴 Multiple cascading service failures observed: 15% auth failures (High: >5%), 10% DB connection errors (High: >5%), and 8% server errors (High: >5%) — all individually High severity during peak incident window.",
+    "🟡 Progressive degradation pattern: Gradual latency increase over 3.5 minutes (100ms→15s) with P90 > avg × 2 throughout (Low tail indicator) but absolute response times extreme, suggesting resource exhaustion."
+  ],
+  "cross_tab_findings": [
+    {
+      "origin": "Product",
+      "severity": "Critical",
+      "issue_detected": "Severe database latency degradation: Response times increased progressively from <100ms to 15,000ms peak (180s-240s window), affecting all database-backed endpoints. Severity: Critical — error rate 25% >5% (High) + P90=14000ms > avg=5000ms × 2 (Low tail ratio but absolute latency catastrophic) + multiple simultaneous High issues = Critical.",
+      "possible_cause": "Database connection pool exhaustion or query performance degradation under load. Gradual increase pattern suggests resource contention from slow queries accumulating in the connection pool, increased table lock contention, or insufficient database scaling capacity.",
+      "suggestions": "Immediate actions: (1) Review database connection pool settings and increase max connections, (2) Analyze slow query logs for queries during incident window, (3) Check database CPU/memory/IO utilization metrics, (4) Implement query timeout limits. Long-term: Add read replicas, implement query caching, optimize heavy analytics queries.",
+      "suggestion_heading": "Critical: Database performance bottleneck requires immediate action",
+      "tab": "summary"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "Authentication service failures: ~15% of requests returned 401 errors at peak (High severity: error rate 15% >5%), starting at 60s mark and progressively increasing to 25% before declining.",
+      "possible_cause": "Auth service cache invalidation or session store failure correlated with database overload. Progressive increase suggests cascading failure as database latency impacted session validation queries. Potential causes: Redis/session store timeout due to DB blocking, JWT validation service overwhelmed, or auth token cache eviction under memory pressure.",
+      "suggestions": "Immediate actions: (1) Review auth service dependency on main database - consider dedicated auth DB or in-memory cache, (2) Check session store health during incident window, (3) Implement circuit breaker for auth validation to prevent cascading failures, (4) Add auth service health checks independent of main DB. Long-term: Decouple auth from main database, use standalone token validation.",
+      "suggestion_heading": "High: Auth service cascading failure - decouple from database",
+      "tab": "requests"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "Database connection failures: ~10% of requests returned 503 errors (High severity: error rate 10% >5%) with 'Database connection timeout' messages at peak (180s-240s), starting at 120s mark.",
+      "possible_cause": "Database connection pool complete exhaustion. When all connections are occupied by slow queries (15s response times), new requests fail immediately with 503. The progressive increase after latency reached 7-13s confirms connection pool saturation as root cause.",
+      "suggestions": "Immediate actions: (1) Increase database connection pool size if possible, (2) Reduce connection timeout to fail fast and free up connections, (3) Implement connection pooling at application level with queue limits, (4) Add database connection pool monitoring alerts. Long-term: Implement read replicas, use connection pooler (PgBouncer/ProxySQL), optimize slow query patterns.",
+      "suggestion_heading": "High: Database connection pool exhaustion",
+      "tab": "requests"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "Server errors spike: ~8% of requests returned 500 errors (High severity: error rate 8% >5%) during peak incident (180s-240s), correlating exactly with maximum database latency period.",
+      "possible_cause": "Application timeouts and crashes due to database query timeouts. When database queries exceed application timeout thresholds (typically 30-60s), applications kill the request and return 500. The tight correlation with DB latency peak suggests timeout-induced failures rather than code bugs.",
+      "suggestions": "Immediate actions: (1) Review application timeout configurations - ensure they're less than load balancer timeouts, (2) Implement graceful degradation for slow database queries, (3) Add request timeout monitoring and alerts, (4) Implement database query timeout limits at ORM/driver level. Long-term: Use circuit breakers to fail fast when DB is slow, implement fallback mechanisms (cached data, degraded service mode).",
+      "suggestion_heading": "High: Application timeout failures require circuit breakers",
+      "tab": "requests"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "User abandonment and retry patterns: Significant retry attempts (~10-15% of requests) and session abandonment (~3-5% of sessions) during peak incident (High severity: consequence of 25% overall error rate >5% driving client-side retry storm and session termination after 3 consecutive failures).",
+      "possible_cause": "Real-world user behavior simulation showing impact of errors and latency. High retry rate indicates client-side retry logic engaging due to 5xx errors. Session abandonment occurs after consecutive failures (3 consecutive errors), demonstrating cascading impact on actual user journeys.",
+      "suggestions": "Recommendations: (1) Implement better user feedback during incidents (friendly error messages, retry guidance), (2) Add client-side circuit breakers to prevent futile retries, (3) Implement graceful degradation UI showing reduced functionality, (4) Monitor abandonment metrics in production to detect incidents early.",
+      "suggestion_heading": "High: User experience severely impacted - monitor abandonment metrics",
+      "tab": "summary"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "Analytics service severely impacted: Response times 30% slower than other services (~19.5s vs ~15s), with 30% failure rate (High: error rate 30% >5%) vs 20% overall during peak.",
+      "possible_cause": "Analytics endpoints execute heavy database queries (aggregations, joins, large result sets) which are disproportionately affected by database performance degradation. Under normal conditions these queries take 500ms-1s, but under DB load they amplified to 19.5s, overwhelming connection pools and timeouts first.",
+      "suggestions": "Immediate actions: (1) Move analytics queries to separate read replica or analytics database, (2) Implement longer timeouts specifically for analytics endpoints or fail fast with cached results, (3) Add query result caching for analytics dashboards. Long-term: Migrate analytics to dedicated OLAP database (e.g., ClickHouse, BigQuery), pre-aggregate analytics data in background jobs.",
+      "suggestion_heading": "High: Analytics service needs dedicated infrastructure",
+      "tab": "requests"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "Large payload responses disproportionately failing: Requests with 300KB payloads showed ~35% effective error rate during stress period (180s-240s) — 40% higher than the already-High 25% base error rate (High: ~35% >5%). Payload responses amplify timeouts when combined with 15s DB latency.",
+      "possible_cause": "Large payload serialization and transmission amplifies underlying latency issues. When database queries are already slow (15s), adding 300KB JSON serialization and network transfer causes total request time to exceed timeouts. Memory pressure from large payloads may also contribute to GC pauses.",
+      "suggestions": "Immediate actions: (1) Implement response pagination to reduce payload sizes, (2) Add streaming responses for large result sets, (3) Set maximum response size limits. Long-term: Use GraphQL or field selection to allow clients to request only needed data, implement response compression, consider gRPC for large binary payloads.",
+      "suggestion_heading": "High: Large payloads amplifying latency - implement pagination",
+      "tab": "requests"
+    },
+    {
+      "origin": "Product",
+      "severity": "Medium",
+      "issue_detected": "Progressive degradation pattern: Latency increased gradually over 3.5 minutes (30s→210s) with P90=14000ms > avg=5000ms × 2 (Low tail ratio threshold met throughout) — pattern of gradual increase rather than sudden spike rules out infrastructure event and suggests resource exhaustion or connection leak.",
+      "possible_cause": "Resource exhaustion pattern rather than infrastructure failure. This indicates: (1) Database connection pool filling up slowly as queries take longer, (2) Memory/CPU gradually consumed by queued operations, (3) Possible connection leak where slow queries don't release connections properly. The smooth progression rules out sudden events like deployment or traffic spike.",
+      "suggestions": "Investigate: (1) Review application metrics for resource consumption trends (heap usage, thread pool size, connection pool utilization), (2) Check for connection leaks - connections not properly closed after query completion, (3) Analyze if this correlates with specific user activity patterns. Add monitoring for resource utilization rate-of-change to detect progressive degradation early.",
+      "suggestion_heading": "Medium: Progressive degradation indicates resource leak",
+      "tab": "summary"
+    },
+    {
+      "origin": "Product",
+      "severity": "Medium",
+      "issue_detected": "Recovery observed but incomplete: After 300s mark, latency stabilized at 500ms (P90 ~1000ms > avg=500ms × 2 = Low tail threshold met) and auth failures persisted at 2% (Medium: error rate 2% within 1-5% range) vs 0% baseline — system has not returned to healthy state.",
+      "possible_cause": "Partial recovery suggests underlying issue not fully resolved. Possible causes: (1) Some database connections/queries still slow, (2) Database still recovering from load (cache warming, index rebuilding), (3) Residual auth cache invalidation issues, (4) Connection pool not fully refreshed. The 5x baseline latency indicates system hasn't fully returned to healthy state.",
+      "suggestions": "Post-incident actions: (1) Monitor for secondary incident - system may still be vulnerable, (2) Review what triggered recovery at 300s mark (manual intervention? Auto-scaling? Traffic drop?), (3) Implement health checks that validate full recovery (not just 'green' status), (4) Consider forced connection pool refresh or service restart to clear residual issues. Set up alerts for sustained elevated latency even when below critical thresholds.",
+      "suggestion_heading": "Medium: Incomplete recovery - monitor for secondary incidents",
+      "tab": "summary"
+    },
+    {
+      "origin": "Environment",
+      "severity": "Low",
+      "issue_detected": "Health check endpoints remained responsive (<50ms) throughout incident, not reflecting actual service degradation visible in other endpoints.",
+      "possible_cause": "Health checks may be too simplistic - likely only checking if service is 'alive' rather than validating actual database connectivity and performance. This creates false positive 'healthy' signals during database performance degradation.",
+      "suggestions": "Enhance health checks: (1) Add database connectivity check with query execution, (2) Implement 'deep' health check endpoint that validates all critical dependencies, (3) Report degraded state (not just healthy/unhealthy binary), (4) Include recent error rate and P95 latency in health check response. Ensure load balancer uses deep health checks for routing decisions.",
+      "suggestion_heading": "Low: Enhance health checks to detect database issues",
+      "tab": "requests"
+    },
+    {
+      "origin": "Test Configuration",
+      "severity": "Info",
+      "issue_detected": "Test successfully simulated realistic cascading failure pattern with clear root cause (database overload) and multiple downstream effects including retries, abandonment, and progressive degradation.",
+      "possible_cause": "N/A - This is the intended test scenario demonstrating real-world behaviors.",
+      "suggestions": "This test scenario is excellent for RCA validation as it demonstrates: (1) Clear root cause with cascading effects, (2) Progressive degradation timeline, (3) Multiple correlated failure modes, (4) Recovery pattern, (5) Realistic service interactions including user abandonment and retries. Use as benchmark for RCA agent evaluation - agent should identify database as root cause and auth/server errors as cascading effects, not independent issues.",
+      "suggestion_heading": "Info: Test scenario validation successful",
+      "tab": "summary"
+    }
+  ]
+}

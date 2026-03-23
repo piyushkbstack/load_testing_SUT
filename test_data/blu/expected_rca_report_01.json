@@ -1,0 +1,72 @@
+{
+  "top_findings": [
+    "🔴 Severe backend latency degradation detected: API response times escalated progressively from ~50ms baseline to 15,000ms peak over 210 seconds, with P90 > avg × 3 (High tail latency) across all DB-backed endpoints — indicating database connection pool exhaustion as root cause.",
+    "🔴 Checkout and critical user flows broken at peak: /api/checkout and /api/payments returned 504 (timeout) and 503 (DB error) during peak window (180s–240s), meaning 100% of attempted purchases failed — High severity (error rate >5% on revenue-critical path).",
+    "🟡 Progressive degradation pattern confirms resource exhaustion: Latency curve followed a smooth 3.5-minute ramp (50ms→15000ms) rather than a sudden spike, ruling out infrastructure event and pointing to gradual connection pool saturation from slow-query accumulation."
+  ],
+  "cross_tab_findings": [
+    {
+      "origin": "Product",
+      "severity": "Critical",
+      "issue_detected": "Database connection pool exhaustion: Response times grew continuously from 50ms to 15,000ms over 210s (Phase 2–4). At peak (180s–240s), /api/checkout returned 504 and /api/orders returned 503 with 'Database connection timeout' — error rate on order endpoints exceeded 50% (High: >5%). Simultaneous failures across multiple DB-backed services = Critical (multiple High issues concurrent).",
+      "possible_cause": "Database connection pool filled gradually as queries took longer, preventing new connections. Slow queries (analytics aggregations, order lookups) held connections for 15s each, exhausting the pool. Once saturated, all DB-dependent endpoints queue and timeout. Smooth latency ramp confirms slow query accumulation rather than sudden infrastructure failure.",
+      "suggestions": "Immediate actions: (1) Review DB connection pool max size and increase if capacity allows, (2) Enable slow query logging and identify queries causing the hold, (3) Implement per-endpoint query timeout (e.g., 5s for product APIs, 30s for analytics), (4) Add circuit breaker — fail fast with cached data when DB latency exceeds threshold. Long-term: Add read replicas for analytics endpoints, implement query result caching (Redis), optimize ORDER BY queries with proper indexing.",
+      "suggestion_heading": "Critical: Database connection pool exhaustion — immediate query optimization required",
+      "tab": "summary"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "Analytics endpoints disproportionately affected: /api/analytics and /api/reports reached 504 (timeout) from Phase 3 onward (90s mark), 30% earlier than product/order endpoints. These endpoints showed the first timeout signals — indicating they run the heaviest queries (aggregations, joins) which saturate DB connections fastest.",
+      "possible_cause": "Analytics queries execute full-table scans and multi-table joins, holding DB connections for 6–15s under load. Under normal conditions these complete in 500ms–1s, but during connection contention they queue and exceed application timeout. Analytics became the cascade trigger — their slow queries reduced available connections for faster product/order queries.",
+      "suggestions": "Immediate actions: (1) Move analytics to a dedicated read replica to isolate from transactional DB, (2) Set a 10s hard timeout on analytics queries — return partial cached results if exceeded, (3) Pre-aggregate analytics data in background jobs (nightly/hourly) rather than computing on request. Long-term: Migrate analytics to an OLAP database (ClickHouse, BigQuery, Redshift) purpose-built for aggregations.",
+      "suggestion_heading": "High: Analytics queries are the cascade trigger — isolate to read replica",
+      "tab": "requests"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "Revenue path completely broken at peak: Phase 4 tests confirm /api/checkout returned 504 and /api/cart returned 503 with DB error during the 180s–240s peak window (error rate on checkout = 100% during peak, High: >5%). Users attempting purchases during this window received error responses with no fallback.",
+      "possible_cause": "Checkout endpoints depend on DB for inventory validation, payment processing state, and order creation — all DB-backed. When the connection pool was exhausted, checkout had no graceful degradation path. Unlike read endpoints (products, search) which could serve stale cache, checkout requires live DB writes and has no fallback.",
+      "suggestions": "Immediate actions: (1) Implement a checkout queue — accept order intent and process async when DB recovers, (2) Reserve dedicated DB connections for checkout path (connection priority pools), (3) Add user-facing error message with retry guidance during outage. Long-term: Implement CQRS — separate write path (orders) from read path (catalog), use an event queue (Kafka/SQS) to buffer checkout requests during DB degradation.",
+      "suggestion_heading": "High: Checkout has no graceful degradation — implement async order queue",
+      "tab": "requests"
+    },
+    {
+      "origin": "Product",
+      "severity": "High",
+      "issue_detected": "Health endpoints masked the incident: /api/health and /api/status returned 200 throughout the entire degradation (Phase 1–5) while app endpoints returned 503/504. This produces a false 'all green' signal in monitoring dashboards during an active outage.",
+      "possible_cause": "Health check endpoints bypass the database — they only verify that the application process is alive. They do not validate DB connectivity, connection pool depth, or query performance. Load balancers and monitoring systems relying solely on /api/health would not have triggered alerts or routing changes despite the full connection pool exhaustion.",
+      "suggestions": "Immediate: (1) Add /api/health/deep that runs a test DB query (SELECT 1) and measures latency, (2) Return HTTP 503 from health check when DB query latency exceeds 500ms, (3) Expose connection pool metrics in health response (active_connections, pool_size, wait_queue_depth). Long-term: Implement synthetic monitoring — run end-to-end health checks (browse → cart → checkout) and alert if any step fails, not just process liveness.",
+      "suggestion_heading": "High: Shallow health checks missed the outage — implement deep health validation",
+      "tab": "requests"
+    },
+    {
+      "origin": "Product",
+      "severity": "Medium",
+      "issue_detected": "Incomplete recovery at 300s: Phase 5 tests show product and user endpoints recovering at 500ms latency (P90 ~1000ms > avg=500ms × 2, Low tail threshold) but residual latency is 10× baseline. System has not returned to the healthy 50ms baseline — indicating the DB is still warming up (cache reload, connection pool refilling).",
+      "possible_cause": "DB recovery is gradual — connection pool refills as held connections are released, query plan cache is rebuilt, and buffer pool (page cache) is repopulated. The 500ms residual vs 50ms baseline indicates the DB is in a degraded-normal state. A second traffic spike during this window would likely trigger a repeat incident.",
+      "suggestions": "Post-incident: (1) Monitor for secondary incident for 30 minutes after apparent recovery, (2) Implement a traffic ramp-up strategy after DB recovery — use a circuit breaker to throttle incoming load while recovery completes, (3) Add recovery SLO alert: page if latency remains >200ms for >5 minutes after incident close. Long-term: Pre-warm connection pool on recovery with synthetic requests before fully opening traffic.",
+      "suggestion_heading": "Medium: Incomplete recovery — monitor and throttle traffic during DB warmup",
+      "tab": "summary"
+    },
+    {
+      "origin": "Environment",
+      "severity": "Low",
+      "issue_detected": "No request timeout enforcement at API gateway: Peak checkout requests hit 15,000ms before returning 504, suggesting no upstream timeout (load balancer or API gateway) terminated slow requests earlier. Holding connections open for 15s amplifies connection pool saturation — each stalled request blocks a DB connection for the full 15s.",
+      "possible_cause": "API gateway or load balancer timeout not configured, or set too high (>15s). Best practice is 3–10s gateway timeout for transactional endpoints, forcing fast failure and freeing held connections sooner. Without this, slow queries hold connections until they naturally finish or DB server times out.",
+      "suggestions": "Configure (1) API gateway timeout: 10s for product/user endpoints, 30s for analytics, 5s for auth/validate, (2) Add keep-alive and pool timeout at the DB driver level, (3) Return 503 with Retry-After header immediately when connection pool wait queue exceeds threshold — fail fast rather than holding the connection.",
+      "suggestion_heading": "Low: Add API gateway timeouts to limit connection hold duration",
+      "tab": "summary"
+    },
+    {
+      "origin": "Test Configuration",
+      "severity": "Info",
+      "issue_detected": "Test successfully simulated a realistic progressive DB latency degradation with 5 distinct phases: baseline (50ms) → ramp (200ms–3s) → critical (3s–8s) → peak (8s–15s) → recovery (15s→500ms). The timeline is sufficient for RCA agent to identify the root cause (DB connection pool) vs. downstream effects (checkout/analytics failures).",
+      "possible_cause": "N/A — intended test scenario.",
+      "suggestions": "RCA agent should identify: (1) DB connection pool exhaustion as root cause, (2) Analytics as cascade trigger (first to fail), (3) Checkout as highest-impact victim, (4) Health endpoints as false-negative monitoring gap. Agents that identify all 4 elements score full validation credit.",
+      "suggestion_heading": "Info: Test scenario validation — progressive DB latency degradation",
+      "tab": "summary"
+    }
+  ]
+}

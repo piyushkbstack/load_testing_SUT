@@ -48,8 +48,8 @@ const analyticsEndpoints = ['/api/analytics', '/api/metrics', '/api/dashboard', 
 const healthEndpoints = ['/api/health', '/api/status'];
 
 export const options = {
-  vus: 10,
-  duration: '7m',
+  vus: 1,
+  duration: '2m',
   thresholds: {
     http_req_failed: ['rate<0.3'], // Allow up to 30% failure during peak incident
     http_req_duration: ['p(95)<10000'], // 95% under 10s
