@@ -3,6 +3,40 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
+  // LTAR-470: opt-in bot-exemption simulation (mimics an Akamai custom bot
+  // with action=Allow). Only active when ?requireToken=<expected> is passed.
+  //   requireToken=<value>    X-LoadTest-Token must equal <value>
+  //   allowIps=<ip>,<ip>      optional: client IP must also be in this list
+  //   blockMode=403|tarpit    403 (default) or hold the connection 35 s, then 403
+  //                           (tarpit reproduces the customer's "Read timed out")
+  const requiredToken = url.searchParams.get("requireToken");
+  if (requiredToken) {
+    const token = request.headers.get("x-loadtest-token");
+    const clientIp = request.headers.get("cf-connecting-ip");
+    const allowIps = (url.searchParams.get("allowIps") || "")
+      .split(",").map((s) => s.trim()).filter(Boolean);
+    const tokenOk = token === requiredToken;
+    const ipOk = allowIps.length === 0 || allowIps.includes(clientIp);
+
+    if (!tokenOk || !ipOk) {
+      const reason = !tokenOk ? "missing or wrong X-LoadTest-Token" : "IP not allowlisted";
+      console.log(JSON.stringify({
+        ts: new Date().toISOString(), route: path, decision: "blocked",
+        reason, sourceIp: clientIp, loadTestToken: token
+      }));
+      if (url.searchParams.get("blockMode") === "tarpit") {
+        await new Promise((resolve) => setTimeout(resolve, 35000));
+      }
+      return new Response(JSON.stringify({
+        success: false, blocked: true, reason,
+        meta: { sourceIp: clientIp, loadTestToken: token }
+      }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
+      });
+    }
+  }
+
   // Query parameters
   const delay = parseInt(url.searchParams.get("delay")) || 0;
   let status = parseInt(url.searchParams.get("status")) || 200;
@@ -81,8 +115,20 @@ export async function onRequest(context) {
   payload.meta = {
     processingTime: Date.now() - payload.timestamp,
     userAgent: request.headers.get("user-agent") || "unknown",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    // LTAR-470: echo the custom load-test header and the real client IP so a
+    // load test can verify the header reaches the server and which IPs it comes from.
+    loadTestToken: request.headers.get("x-loadtest-token"),
+    sourceIp: request.headers.get("cf-connecting-ip")
   };
+
+  // Visible via `wrangler pages deployment tail --project-name load-testing-sut`
+  console.log(JSON.stringify({
+    ts: payload.meta.timestamp,
+    route: path,
+    sourceIp: payload.meta.sourceIp,
+    loadTestToken: payload.meta.loadTestToken
+  }));
 
   return new Response(JSON.stringify(payload), {
     status: status,
