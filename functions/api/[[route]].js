@@ -81,8 +81,20 @@ export async function onRequest(context) {
   payload.meta = {
     processingTime: Date.now() - payload.timestamp,
     userAgent: request.headers.get("user-agent") || "unknown",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    // LTAR-470: echo the custom load-test header and the real client IP so a
+    // load test can verify the header reaches the server and which IPs it comes from.
+    loadTestToken: request.headers.get("x-loadtest-token"),
+    sourceIp: request.headers.get("cf-connecting-ip")
   };
+
+  // Visible via `wrangler pages deployment tail --project-name load-testing-sut`
+  console.log(JSON.stringify({
+    ts: payload.meta.timestamp,
+    route: path,
+    sourceIp: payload.meta.sourceIp,
+    loadTestToken: payload.meta.loadTestToken
+  }));
 
   return new Response(JSON.stringify(payload), {
     status: status,
